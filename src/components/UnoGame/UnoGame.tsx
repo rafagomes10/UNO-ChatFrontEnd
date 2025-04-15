@@ -158,9 +158,9 @@ const UnoGame: React.FC = () => {
       )}
 
       <div className="fixed top-4 right-4 space-y-2 z-50">
-        {notifications.map((notification) => (
+        {notifications.map((notification, index) => (
           <UnoNotification
-            key={notification.id}
+            key={index}
             message={notification.message}
             type={notification.type}
             onClose={() => removeNotification(notification.id)}
