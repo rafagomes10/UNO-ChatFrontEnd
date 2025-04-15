@@ -1,0 +1,188 @@
+.rocket-wrapper {
+  position: fixed;
+  bottom: -150px;
+  right: 10%;
+  width: 80px;
+  height: 200px;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0;
+  transform: rotate(-45deg); /* Inclinação fixa para seguir a direção da seta */
+}
+
+.rocket-wrapper.animate {
+  animation: rocketFly 8s linear forwards; /* Alterado para linear para movimento constante */
+  opacity: 1;
+}
+
+@keyframes rocketFly {
+  0% {
+    bottom: -150px;
+    right: 10%;
+    transform: rotate(-45deg);
+  }
+  20% {
+    bottom: 20%;
+    right: 28%;
+    transform: rotate(-45deg); /* Mantendo a mesma inclinação */
+  }
+  40% {
+    bottom: 40%;
+    right: 46%;
+    transform: rotate(-45deg); /* Mantendo a mesma inclinação */
+  }
+  60% {
+    bottom: 60%;
+    right: 64%;
+    transform: rotate(-45deg); /* Mantendo a mesma inclinação */
+  }
+  80% {
+    bottom: 80%;
+    right: 82%;
+    transform: rotate(-45deg); /* Mantendo a mesma inclinação */
+  }
+  100% {
+    bottom: 110%;
+    right: 100%;
+    transform: rotate(-45deg); /* Mantendo a mesma inclinação */
+  }
+}
+
+.rocket {
+  position: relative;
+  width: 40px;
+  height: 120px;
+  margin: 0 auto;
+}
+
+.rocket-body {
+  width: 40px;
+  height: 80px;
+  background-color: #f5f5f5;
+  border-radius: 50% 50% 30% 30%;
+  position: relative;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.window {
+  width: 15px;
+  height: 15px;
+  background-color: #6699cc;
+  border-radius: 50%;
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 2px solid #333;
+  box-shadow: 0 0 5px rgba(102, 153, 204, 0.8) inset;
+}
+
+.fin {
+  position: absolute;
+  width: 15px;
+  height: 30px;
+  background-color: #ff4500;
+  bottom: 0;
+}
+
+.fin-left {
+  left: -15px;
+  border-radius: 10px 0 0 0;
+  transform: skewY(40deg);
+}
+
+.fin-right {
+  right: -15px;
+  border-radius: 0 10px 0 0;
+  transform: skewY(-40deg);
+}
+
+.exhaust-flame {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 30px;
+  background: linear-gradient(to bottom, #ff5c00, #ffbb00, #ffff00);
+  border-radius: 0 0 20px 20px;
+  animation: flameFlicker 0.15s infinite alternate;
+  box-shadow: 0 0 10px 5px rgba(255, 165, 0, 0.5);
+  z-index: 5;
+}
+
+.exhaust-flame::before, 
+.exhaust-flame::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  width: 10px;
+  height: 20px;
+  background: linear-gradient(to bottom, #ff5c00, #ffff00);
+  border-radius: 0 0 10px 10px;
+  animation: smallFlameFlicker 0.2s infinite alternate;
+}
+
+.exhaust-flame::before {
+  left: -8px;
+  transform: rotate(-20deg);
+}
+
+.exhaust-flame::after {
+  right: -8px;
+  transform: rotate(20deg);
+}
+
+@keyframes flameFlicker {
+  0% {
+    height: 30px;
+    opacity: 0.8;
+    background-position: 0% 0%;
+  }
+  50% {
+    height: 35px;
+    opacity: 0.9;
+    background-position: 0% 50%;
+  }
+  100% {
+    height: 40px;
+    opacity: 1;
+    background-position: 0% 100%;
+  }
+}
+
+@keyframes smallFlameFlicker {
+  0% {
+    height: 15px;
+    opacity: 0.7;
+  }
+  100% {
+    height: 25px;
+    opacity: 0.9;
+  }
+}
+
+.spark {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: #ffff00;
+  box-shadow: 0 0 3px 1px rgba(255, 255, 0, 0.8);
+  opacity: 0;
+  bottom: -35px;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: sparkAnimation 1s infinite;
+}
+
+@keyframes sparkAnimation {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx), var(--ty)) scale(0.2);
+  }
+}
