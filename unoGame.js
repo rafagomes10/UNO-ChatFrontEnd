@@ -77,8 +77,8 @@ function createDeck() {
 
     // Cartas coringa (4 de cada)
     for (let i = 0; i < 4; i++) {
-        deck.push({ type: CARD_TYPES.WILD });
-        deck.push({ type: CARD_TYPES.WILD_DRAW_FOUR });
+        deck.push({ type: CARD_TYPES.WILD, color: null, value: 'wild' });
+        deck.push({ type: CARD_TYPES.WILD_DRAW_FOUR, color: null, value: 'wild_draw_four' });
     }
 
     return deck;
@@ -91,6 +91,82 @@ function shuffleDeck(deck) {
         [deck[i], deck[j]] = [deck[j], deck[i]];
     }
     return deck;
+}
+
+// Função para passar para o próximo jogador
+function nextPlayer(room) {
+    const currentIndex = room.players.indexOf(room.currentPlayer);
+    const nextIndex = (currentIndex + room.direction + room.players.length) % room.players.length;
+    room.currentPlayer = room.players[nextIndex];
+}
+
+// Função para obter o tamanho das mãos dos oponentes
+function getOpponentHandSizes(room, currentPlayerId) {
+    const result = {};
+    room.players.forEach(playerId => {
+        if (playerId !== currentPlayerId) {
+            const playerName = connectedUsers.get(playerId);
+            if (playerName && room.hands[playerName]) {
+                result[playerName] = room.hands[playerName].length;
+            }
+        }
+    });
+    return result;
+}
+
+// Função para lidar com cartas especiais
+function handleSpecialCard(room, card, io, roomId) {
+    if (card.type === CARD_TYPES.SKIP) {
+        nextPlayer(room); // Pula o próximo jogador
+    } else if (card.type === CARD_TYPES.REVERSE) {
+        room.direction *= -1; // Inverte a direção
+    } else if (card.type === CARD_TYPES.DRAW_TWO) {
+        nextPlayer(room); // Passa para o próximo jogador
+        const playerToDraw = room.currentPlayer;
+        const playerName = connectedUsers.get(playerToDraw);
+        
+        // Comprar duas cartas
+        for (let i = 0; i < 2; i++) {
+            if (room.deck.length === 0) {
+                // Reembaralhar o monte de descarte, exceto a carta do topo
+                const topCard = room.discardPile.pop();
+                room.deck = shuffleDeck([...room.discardPile]);
+                room.discardPile = [topCard];
+            }
+            if (room.deck.length > 0 && playerName && room.hands[playerName]) {
+                room.hands[playerName].push(room.deck.pop());
+            }
+        }
+        
+        // Notificar o jogador que comprou cartas
+        io.to(playerToDraw).emit('uno-cards-drawn', {
+            hand: room.hands[playerName],
+            count: 2
+        });
+    } else if (card.type === CARD_TYPES.WILD_DRAW_FOUR) {
+        nextPlayer(room); // Passa para o próximo jogador
+        const playerToDraw = room.currentPlayer;
+        const playerName = connectedUsers.get(playerToDraw);
+        
+        // Comprar quatro cartas
+        for (let i = 0; i < 4; i++) {
+            if (room.deck.length === 0) {
+                // Reembaralhar o monte de descarte, exceto a carta do topo
+                const topCard = room.discardPile.pop();
+                room.deck = shuffleDeck([...room.discardPile]);
+                room.discardPile = [topCard];
+            }
+            if (room.deck.length > 0 && playerName && room.hands[playerName]) {
+                room.hands[playerName].push(room.deck.pop());
+            }
+        }
+        
+        // Notificar o jogador que comprou cartas
+        io.to(playerToDraw).emit('uno-cards-drawn', {
+            hand: room.hands[playerName],
+            count: 4
+        });
+    }
 }
 
 // Configurar os eventos do socket para o UNO
@@ -206,6 +282,96 @@ function setupUnoEvents(io, socket) {
         console.log(`Jogo UNO iniciado na sala ${roomId}`);
     });
 
+    // Quando o cliente joga uma carta
+    socket.on('play-uno-card', ({ roomId, cardIndex, chosenColor }) => {
+        console.log(`Jogador tentando jogar carta: roomId=${roomId}, cardIndex=${cardIndex}, chosenColor=${chosenColor}`);
+        
+        const room = unoRooms.get(roomId);
+        
+        if (!room || room.status !== 'active') {
+            socket.emit('uno-game-error', 'Jogo não encontrado ou não iniciado');
+            return;
+        }
+        
+        if (room.currentPlayer !== socket.id) {
+            socket.emit('uno-game-error', 'Não é sua vez');
+            return;
+        }
+        
+        const playerName = connectedUsers.get(socket.id);
+        if (!playerName || !room.hands[playerName]) {
+            socket.emit('uno-game-error', 'Jogador não encontrado');
+            return;
+        }
+        
+        const card = room.hands[playerName][cardIndex];
+        if (!card) {
+            socket.emit('uno-game-error', 'Carta não encontrada');
+            return;
+        }
+        
+        // Verificar se a carta pode ser jogada
+        const topCard = room.discardPile[room.discardPile.length - 1];
+        const canPlay = 
+            card.color === room.currentColor || 
+            (topCard && card.value === topCard.value) || 
+            card.type === CARD_TYPES.WILD || 
+            card.type === CARD_TYPES.WILD_DRAW_FOUR;
+        
+        if (!canPlay) {
+            socket.emit('uno-game-error', 'Essa carta não pode ser jogada agora');
+            return;
+        }
+        
+        console.log(`Jogador ${playerName} jogando carta:`, card);
+        
+        // Remover a carta da mão do jogador
+        const playedCard = room.hands[playerName].splice(cardIndex, 1)[0];
+        
+        // Lidar com cartas coringas
+        if ((playedCard.type === CARD_TYPES.WILD || playedCard.type === CARD_TYPES.WILD_DRAW_FOUR) && chosenColor) {
+            room.currentColor = chosenColor;
+        } else {
+            room.currentColor = playedCard.color;
+        }
+        
+        // Adicionar a carta ao monte de descarte
+        room.discardPile.push(playedCard);
+        
+        // Lidar com cartas especiais
+        handleSpecialCard(room, playedCard, io, roomId);
+        
+        // Passar para o próximo jogador (se não for uma carta especial que já mudou o jogador)
+        if (playedCard.type !== CARD_TYPES.SKIP && 
+            playedCard.type !== CARD_TYPES.REVERSE && 
+            playedCard.type !== CARD_TYPES.DRAW_TWO && 
+            playedCard.type !== CARD_TYPES.WILD_DRAW_FOUR) {
+            nextPlayer(room);
+        }
+        
+        // Notificar todos os jogadores
+        io.to(roomId).emit('uno-game-state', {
+            topCard: playedCard,
+            currentPlayer: connectedUsers.get(room.currentPlayer) || room.currentPlayer,
+            currentColor: room.currentColor,
+            opponentHandSize: getOpponentHandSizes(room, socket.id)
+        });
+        
+        // Notificar o jogador que jogou a carta
+        socket.emit('uno-card-played', {
+            hand: room.hands[playerName],
+            success: true
+        });
+        
+        // Verificar se o jogador ganhou
+        if (room.hands[playerName].length === 0) {
+            io.to(roomId).emit('uno-game-over', {
+                winner: playerName
+            });
+            room.status = 'game_over';
+        }
+    });
+
     // Quando o cliente compra uma carta
     socket.on('draw-uno-card', (roomId) => {
         const room = unoRooms.get(roomId);
@@ -251,6 +417,132 @@ function setupUnoEvents(io, socket) {
         });
         
         console.log(`Jogador ${playerName} comprou uma carta`);
+        
+        // Passar para o próximo jogador
+        nextPlayer(room);
+        
+        // Notificar todos os jogadores sobre a mudança de jogador
+        io.to(roomId).emit('uno-game-state', {
+            currentPlayer: connectedUsers.get(room.currentPlayer) || room.currentPlayer,
+            opponentHandSize: getOpponentHandSizes(room, socket.id)
+        });
+    });
+
+    // Quando o jogador chama UNO
+    socket.on('call-uno', (roomId) => {
+        const room = unoRooms.get(roomId);
+        
+        if (!room || room.status !== 'active') {
+            socket.emit('uno-game-error', 'Jogo não encontrado ou não iniciado');
+            return;
+        }
+        
+        const playerName = connectedUsers.get(socket.id);
+        if (!playerName || !room.hands[playerName]) {
+            socket.emit('uno-game-error', 'Jogador não encontrado');
+            return;
+        }
+        
+        if (room.hands[playerName].length !== 1) {
+            socket.emit('uno-game-error', 'Você só pode chamar UNO quando tiver uma carta');
+            return;
+        }
+        
+        // Marcar que o jogador chamou UNO
+        room.calledUno = socket.id;
+        
+        // Notificar todos os jogadores
+        io.to(roomId).emit('uno-called', {
+            player: playerName
+        });
+        
+        console.log(`Jogador ${playerName} chamou UNO!`);
+    });
+
+    // Quando o jogador desafia um UNO não chamado
+    socket.on('challenge-uno', ({ roomId, targetPlayer }) => {
+        const room = unoRooms.get(roomId);
+        
+        if (!room || room.status !== 'active') {
+            socket.emit('uno-game-error', 'Jogo não encontrado ou não iniciado');
+            return;
+        }
+        
+        // Encontrar o ID do socket do jogador alvo pelo nome
+        let targetPlayerId = null;
+        for (const [id, name] of connectedUsers.entries()) {
+            if (name === targetPlayer) {
+                targetPlayerId = id;
+                break;
+            }
+        }
+        
+        if (!targetPlayerId || !room.hands[targetPlayer]) {
+            socket.emit('uno-game-error', 'Jogador alvo não encontrado');
+            return;
+        }
+        
+        if (room.hands[targetPlayer].length !== 1) {
+            socket.emit('uno-game-error', 'O jogador alvo não tem apenas uma carta');
+            return;
+        }
+        
+        // Verificar se o jogador alvo chamou UNO
+        if (room.calledUno === targetPlayerId) {
+            // O desafio falhou, o desafiante compra uma carta
+            const challengerName = connectedUsers.get(socket.id);
+            
+            if (room.deck.length === 0) {
+                // Reembaralhar o monte de descarte, exceto a carta do topo
+                const topCard = room.discardPile.pop();
+                room.deck = shuffleDeck(room.discardPile);
+                room.discardPile = [topCard];
+            }
+            
+            if (room.deck.length > 0 && challengerName && room.hands[challengerName]) {
+                room.hands[challengerName].push(room.deck.pop());
+                
+                // Notificar o desafiante
+                socket.emit('uno-challenge-failed', {
+                    hand: room.hands[challengerName]
+                });
+                
+                // Notificar todos os jogadores
+                io.to(roomId).emit('uno-challenge-result', {
+                    challenger: challengerName,
+                    target: targetPlayer,
+                    success: false,
+                    opponentHandSize: getOpponentHandSizes(room, socket.id)
+                });
+            }
+        } else {
+            // O desafio teve sucesso, o jogador alvo compra duas cartas
+            for (let i = 0; i < 2; i++) {
+                if (room.deck.length === 0) {
+                    // Reembaralhar o monte de descarte, exceto a carta do topo
+                    const topCard = room.discardPile.pop();
+                    room.deck = shuffleDeck(room.discardPile);
+                    room.discardPile = [topCard];
+                }
+                
+                if (room.deck.length > 0) {
+                    room.hands[targetPlayer].push(room.deck.pop());
+                }
+            }
+            
+            // Notificar o jogador alvo
+            io.to(targetPlayerId).emit('uno-challenge-succeeded', {
+                hand: room.hands[targetPlayer]
+            });
+            
+            // Notificar todos os jogadores
+            io.to(roomId).emit('uno-challenge-result', {
+                challenger: connectedUsers.get(socket.id),
+                target: targetPlayer,
+                success: true,
+                opponentHandSize: getOpponentHandSizes(room, socket.id)
+            });
+        }
     });
 
     // Quando o cliente sai da sala
@@ -355,6 +647,7 @@ function startGame(roomId, io) {
     room.currentPlayer = room.players[0];
     room.currentColor = topCard.color || 'red'; // Padrão para vermelho em cartas coringas
     room.status = 'active';
+    room.calledUno = null; // Rastrear quem chamou UNO
 
     // Notificar todos os jogadores
     io.to(roomId).emit('uno-game-started', {

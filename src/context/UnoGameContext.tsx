@@ -435,6 +435,9 @@ export const UnoGameProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return;
       }
       
+      // Log the card being played and the current top card for debugging
+      console.log('Playing card:', cardToPlay, 'Current top card:', state.topCard, 'Current color:', state.currentColor);
+      
       socket.emit('play-uno-card', {
         roomId: state.roomCode,
         cardIndex,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUnoGame } from '@/context/UnoGameContext';
 import { useChat } from '@/context/ChatContext';
 import { UnoCardColor } from '@/types/unoGame';
@@ -45,17 +45,39 @@ const UnoGame: React.FC = () => {
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
 
   const handleCardPlay = (cardIndex: number) => {
-    if (currentPlayer !== currentUser) return;
+    if (currentPlayer !== currentUser) {
+      console.log('Not your turn');
+      return;
+    }
     
     const card = hand[cardIndex];
-    if (!card) return;
+    if (!card) {
+      console.log('Card not found');
+      return;
+    }
     
-    if (card.type === 'special' || (card.color === null && card.value === 'wild')) {
+    console.log('Attempting to play card:', card, 'Top card:', topCard, 'Current color:', currentColor);
+    
+    // Check if wild card or special card
+    if (card.type === 'wild' || card.type === 'wild_draw_four' || 
+        (card.color === null && card.value === 'wild')) {
       setSelectedCard(cardIndex);
       setShowColorPicker(true);
       return;
     }
+    
+    // Check if card is playable (matches color or value)
+    const isPlayable = 
+      card.color === currentColor || 
+      (topCard && card.value === topCard.value) ||
+      card.type === 'special';
+      
+    if (!isPlayable) {
+      console.log('Card not playable');
+      return;
+    }
 
+    console.log('Playing card at index:', cardIndex);
     playCard(cardIndex);
   };
 
