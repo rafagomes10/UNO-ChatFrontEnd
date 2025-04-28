@@ -40,7 +40,6 @@ const UnoGame: React.FC = () => {
     opponentHandSize
   });
 
-  //const [selectedColor, setSelectedColor] = useState<UnoCardColor | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
 
@@ -58,20 +57,19 @@ const UnoGame: React.FC = () => {
     
     console.log('Attempting to play card:', card, 'Top card:', topCard, 'Current color:', currentColor);
     
-    // Check if wild card or special card
-    if (card.type === 'wild' || card.type === 'wild_draw_four' || 
-        (card.color === null && card.value === 'wild')) {
+    // Checa se é carta coringa (valor especial)
+    const isWildCard = card.value === "wild" || card.value === "wild_draw_four";
+    if (isWildCard) {
       setSelectedCard(cardIndex);
       setShowColorPicker(true);
       return;
     }
-    
-    // Check if card is playable (matches color or value)
-    const isPlayable = 
-      card.color === currentColor || 
+    // Checa se a carta é jogável (cor ou valor)
+    const isPlayable =
+      card.color === currentColor ||
       (topCard && card.value === topCard.value) ||
-      card.type === 'special';
-      
+      card.type === "special";
+    
     if (!isPlayable) {
       console.log('Card not playable');
       return;
@@ -80,6 +78,18 @@ const UnoGame: React.FC = () => {
     console.log('Playing card at index:', cardIndex);
     playCard(cardIndex);
   };
+
+  useEffect(() => {
+    type UnoDropCardEvent = CustomEvent<{ cardIndex: number }>;
+    const handleDropCard = (e: Event) => {
+      const customEvent = e as UnoDropCardEvent;
+      if (!customEvent.detail || typeof customEvent.detail.cardIndex !== 'number') return;
+      handleCardPlay(customEvent.detail.cardIndex);
+    };
+    window.addEventListener('uno-drop-card', handleDropCard as EventListener);
+    return () => window.removeEventListener('uno-drop-card', handleDropCard as EventListener);
+  }, [hand, currentPlayer, currentUser, topCard, currentColor]);
+
 
   const handleColorSelect = (color: UnoCardColor) => {
     if (selectedCard === null) return;
@@ -194,3 +204,4 @@ const UnoGame: React.FC = () => {
 };
 
 export default UnoGame;
+

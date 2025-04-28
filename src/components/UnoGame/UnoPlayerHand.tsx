@@ -19,7 +19,9 @@ const UnoPlayerHand: React.FC<UnoPlayerHandProps> = ({ hand, onPlayCard, isCurre
   return (
     <div className="flex flex-col items-center w-full">
       <h3 className="text-lg font-bold mb-2">Sua mão</h3>
-      <div className="flex justify-center p-2.5 min-h-36">
+      <div className="flex justify-center p-2.5 min-h-36"
+        onDragOver={e => { if (isCurrentPlayer) e.preventDefault(); }}
+      >
         {hand && hand.length > 0 ? (
           hand.map((card, index) => (
             <div 
@@ -30,6 +32,7 @@ const UnoPlayerHand: React.FC<UnoPlayerHandProps> = ({ hand, onPlayCard, isCurre
                 card={card} 
                 onClick={isCurrentPlayer ? () => onPlayCard(index) : undefined}
                 disabled={!isCurrentPlayer}
+                // Drag já está no UnoCard
               />
             </div>
           ))

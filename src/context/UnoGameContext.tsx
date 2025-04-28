@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { UnoCardColor, UnoGameState } from '@/types/unoGame';
+import { UnoCard, UnoCardColor, UnoGameState } from '@/types/unoGame';
 import { io, Socket } from 'socket.io-client';
 import { useChat } from '@/context/ChatContext'; // Importa o contexto do chat para pegar o usuário atual
 
@@ -186,11 +186,11 @@ export const UnoGameProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     const handleGameStarted = (gameData: {
-      hands: Record<string, any[]>;
-      topCard: any;
+      hands: Record<string, UnoCard[]>;
+      topCard: UnoCard;
       currentPlayer: string;
-      currentColor: string;
-      discardPile?: any[];
+      currentColor: UnoCardColor;
+      discardPile?: UnoCard[];
       direction?: number;
     }) => {
       console.log('Game started event received:', gameData);
@@ -419,37 +419,22 @@ export const UnoGameProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const playCard = (cardIndex: number, chosenColor?: UnoCardColor) => {
-    if (state.roomCode && socket?.connected) {
-      // Verificar se é a vez do jogador
-      if (state.currentPlayer !== currentUser) {
-        addNotification('Não é sua vez de jogar!', 'error');
-        return;
-      }
-      
-      console.log(`Tentando jogar carta no índice ${cardIndex}, cor escolhida: ${chosenColor || 'nenhuma'}`);
-      
-      // Verificar se a carta é válida para jogar
-      const cardToPlay = state.hand[cardIndex];
-      if (!cardToPlay) {
-        console.error('Carta inválida selecionada');
-        return;
-      }
-      
-      // Log the card being played and the current top card for debugging
-      console.log('Playing card:', cardToPlay, 'Current top card:', state.topCard, 'Current color:', state.currentColor);
-      
-      socket.emit('play-uno-card', {
-        roomId: state.roomCode,
-        cardIndex,
-        chosenColor
-      });
-      
-      // Feedback para o usuário
-      addNotification('Jogando carta...', 'info');
-    } else {
-      console.error('Não é possível jogar: não está em uma sala ou não está conectado');
-      addNotification('Não foi possível jogar a carta', 'error');
+    if (!socket?.connected || state.gameStatus !== 'active') {
+      addNotification('Não é possível jogar carta agora', 'error');
+      return;
     }
+    if (typeof cardIndex !== 'number' || cardIndex < 0 || cardIndex >= state.hand.length) {
+      addNotification('Índice de carta inválido', 'error');
+      return;
+    }
+    // Log da carta jogada e carta do topo para debug
+    console.log('Jogando carta:', state.hand[cardIndex], 'Top card:', state.topCard);
+    socket.emit('play-uno-card', {
+      roomId: state.roomCode,
+      username: currentUser,
+      cardIndex,
+      chosenColor: chosenColor ?? null
+    });
   };
 
   const drawCard = () => {
@@ -472,12 +457,15 @@ export const UnoGameProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const challengeUno = (targetPlayer: string) => {
-    if (state.roomCode && socket?.connected) {
-      socket.emit('challenge-uno', {
-        roomId: state.roomCode,
-        targetPlayer
-      });
+    if (!socket?.connected || !state.roomCode || !currentUser) {
+      addNotification('Não é possível desafiar UNO agora', 'error');
+      return;
     }
+    socket.emit('challenge-uno', {
+      roomId: state.roomCode,
+      challenger: currentUser,
+      target: targetPlayer
+    });
   };
 
   return (

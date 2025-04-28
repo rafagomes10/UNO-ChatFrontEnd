@@ -25,7 +25,22 @@ const UnoDeck: React.FC<UnoDeckProps> = ({ topCard, onDrawCard, disabled }) => {
       </button>
 
       {/* Pilha de descarte */}
-      <div className="relative">
+      <div className="relative"
+        onDragOver={e => { if (!disabled) e.preventDefault(); }}
+        onDrop={e => {
+          if (!disabled) {
+            const cardIndex = e.dataTransfer.getData('card-index');
+            if (cardIndex !== undefined && cardIndex !== null && cardIndex !== '') {
+              // Chama a função de jogar carta se disponível
+              if (typeof window !== 'undefined' && window.dispatchEvent) {
+                // Dispara um evento customizado para UnoGame
+                const event = new CustomEvent('uno-drop-card', { detail: { cardIndex: Number(cardIndex) } });
+                window.dispatchEvent(event);
+              }
+            }
+          }
+        }}
+      >
         {topCard && (
           <UnoCard
             card={topCard}

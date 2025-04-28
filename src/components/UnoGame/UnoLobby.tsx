@@ -145,10 +145,11 @@ const UnoLobby: React.FC<UnoLobbyProps> = ({ onJoinRoom, onCreateRoom }) => {
 
   // No componente UnoLobby, vamos adicionar uma função para filtrar salas duplicadas
   const getUniqueRooms = () => {
-    const uniqueRooms = [];
-    const roomIds = new Set();
+    type Room = typeof availableRooms[number];
+    const uniqueRooms: Room[] = [];
+    const roomIds: Set<string> = new Set();
     
-    availableRooms.forEach(room => {
+    availableRooms.forEach((room) => {
       if (!roomIds.has(room.id)) {
         roomIds.add(room.id);
         uniqueRooms.push(room);
